@@ -1,0 +1,79 @@
+# Recetario platform stack. Usage: docker compose up -d   (settings come from .env)
+name: recetario
+
+x-dagster-db: &dagster-db
+  POSTGRES_USER: ${POSTGRES_USER}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+services:
+  postgres:
+    image: postgres:18.6
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  db-init:
+    image: postgres:18.6
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: postgres
+    volumes:
+      - ./data_platform/deploy/postgres/init.sql:/init.sql:ro
+    command: ["psql", "-v", "ON_ERROR_STOP=1", "-v", "agent_pw=${AGENT_RO_PASSWORD}", "-v", "julio_pw=${JULIO_PG_PASSWORD}", "-f", "/init.sql"]
+    restart: "no"
+
+  code:
+    build:
+      context: .
+      dockerfile: data_platform/deploy/docker/Dockerfile
+    image: recetario-platform:latest
+    restart: unless-stopped
+    command: ["dagster", "code-server", "start", "-h", "0.0.0.0", "-p", "4000", "-m", "data_platform.orchestration.definitions"]
+    environment:
+      <<: *dagster-db
+      WAREHOUSE_HOST: postgres
+      DESTINATION__POSTGRES__CREDENTIALS: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/warehouse
+      DESTINATION__DUCKLAKE__CREDENTIALS__DUCKLAKE_NAME: recetario_lake
+      DESTINATION__DUCKLAKE__CREDENTIALS__STORAGE__BUCKET_URL: ${LAKE_BUCKET_URL:-az://lake/ducklake}
+      DESTINATION__DUCKLAKE__CREDENTIALS__CATALOG: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/ducklake_catalog
+      DESTINATION__DUCKLAKE__CREDENTIALS__STORAGE__CREDENTIALS__AZURE_STORAGE_ACCOUNT_NAME: ${AZURE_STORAGE_ACCOUNT_NAME}
+      DESTINATION__DUCKLAKE__CREDENTIALS__STORAGE__CREDENTIALS__AZURE_STORAGE_ACCOUNT_KEY: ${AZURE_STORAGE_ACCOUNT_KEY}
+    volumes:
+      - ./data_lake:/app/data_lake
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+  webserver:
+    image: recetario-platform:latest
+    restart: unless-stopped
+    command: ["dagster-webserver", "-h", "0.0.0.0", "-p", "3000", "-w", "data_platform/deploy/dagster/workspace.yaml"]
+    environment: *dagster-db
+    ports:
+      - "127.0.0.1:${DAGSTER_UI_PORT:-3000}:3000"
+    depends_on: [code]
+
+  daemon:
+    image: recetario-platform:latest
+    restart: unless-stopped
+    command: ["dagster-daemon", "run", "-w", "data_platform/deploy/dagster/workspace.yaml"]
+    environment: *dagster-db
+    depends_on: [code]
+
+volumes:
+  pgdata:

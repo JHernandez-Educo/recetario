@@ -1,0 +1,65 @@
+version: 2
+
+models:
+  - name: date_DIM
+    description: Calendar dimension, 2026-2030, Bogotá-local dates.
+    columns:
+      - name: date_id_PK
+        quote: true
+        data_tests: [unique, not_null]
+
+  - name: products_DIM
+    description: >
+      Product dimension at (store, sku) grain, sourced from the SCD2 snapshot:
+      discontinued products remain with is_current = false so the fact never
+      orphans. ingredient_id_FK lands with the recipe phase.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [store_key, sku]
+    columns:
+      - name: product_id_PK
+        quote: true
+        description: Surrogate key, hash of (store, sku).
+        data_tests: [unique, not_null]
+      - name: store_id_FK
+        quote: true
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stores_DIM')
+              field: '"store_id_PK"'
+
+  - name: price_events_FACT
+    description: >
+      Price observation fact, append-only. Grain: (product, captured_at).
+      price_per_gram_cop is the cross-store comparison measure.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['"product_id_FK"', captured_at]
+    columns:
+      - name: product_id_FK
+        quote: true
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('products_DIM')
+              field: '"product_id_PK"'
+      - name: store_id_FK
+        quote: true
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stores_DIM')
+              field: '"store_id_PK"'
+      - name: date_id_FK
+        quote: true
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('date_DIM')
+              field: '"date_id_PK"'
+      - name: price_cop
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1

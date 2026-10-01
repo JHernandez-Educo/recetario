@@ -1,0 +1,55 @@
+version: 2
+
+models:
+  - name: shopify_price_events
+    description: >
+      clean_shopify.price_events — Shopify price history (Mundo Huevo).
+      Same contract and deduplication rule as clean_vtex.price_events.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [store, sku, captured_at]
+    columns:
+      - name: store
+        description: Store key (d1, exito, euro, jumbo, mundohuevo).
+        data_tests: [not_null]
+      - name: sku
+        description: Store-local SKU (VTEX itemId or Shopify variant id).
+        data_tests: [not_null]
+      - name: price_cop
+        description: Observed price, integer Colombian pesos.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+      - name: captured_at
+        description: Observation timestamp (capture time, never source metadata — PRD R9).
+        data_tests: [not_null]
+      - name: source
+        description: scrape | receipt. Receipt observations outrank scraped ones.
+        data_tests:
+          - accepted_values:
+              values: ["scrape", "receipt"]
+
+  - name: shopify_products
+    description: >
+      clean_shopify.products — current Shopify catalog, one row per (store, variant).
+      Attribute history is kept by snapshots_shopify.products_SNAPSHOT.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [store, sku]
+    columns:
+      - name: store
+        data_tests: [not_null]
+      - name: sku
+        data_tests: [not_null]
+      - name: net_grams
+        description: >
+          Package net content in grams, parsed per store dialect
+          (PUM / Valor de Medida / Cantidad / Jumbo ProductData). Null when
+          the package is sold by volume or count, or specs are missing.
+        data_tests:
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 50000
+              config:
+                severity: warn

@@ -1,0 +1,37 @@
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+
+# Secrets — never commit credentials or tokens
+.dlt/secrets.toml
+
+# Data — the warehouse file and raw API responses stay local
+warehouse/
+data_lake/
+
+# Dagster dev's temporary home (runtime scratch, recreated every session)
+.tmp_dagster_home_*/
+
+# Dagster instance state (run history, sensor cursors) — local sandbox for `dagster dev`
+data_platform/orchestration/.dagster_home/
+
+# OS noise
+.DS_Store
+
+# Internal business docs (PRDs, feasibility) — never published
+docs/internal/
+
+# dbt build artifacts
+data_platform/transform/target/
+data_platform/transform/dbt_packages/
+data_platform/transform/logs/
+data_platform/transform/package-lock.concurrent-update-lock
+data_platform/transform/.user.yml
+logs/
+
+# Local environment (passwords) — never commit
+.env
+
+# Archives and other local-only state
+.local/

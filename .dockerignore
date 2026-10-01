@@ -1,0 +1,15 @@
+.git
+.github
+.claude
+.venv
+.env
+.mcp.json
+.dlt/secrets.toml
+.local
+data_lake
+docs/internal
+**/__pycache__
+data_platform/orchestration/.dagster_home
+data_platform/transform/target
+data_platform/transform/dbt_packages
+data_platform/transform/logs

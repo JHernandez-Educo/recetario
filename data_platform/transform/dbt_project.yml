@@ -1,0 +1,25 @@
+# dbt project: transforms for the Recetario warehouse.
+# Layers (see docs/dbt-conventions.md): raw (dlt-owned) -> clean_<source> -> marts (where sources are unioned).
+name: recetario
+version: "1.0.0"
+profile: recetario
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  recetario:
+    clean_vtex:
+      +schema: clean_vtex
+      +materialized: table
+    clean_shopify:
+      +schema: clean_shopify
+      +materialized: table
+    marts:
+      +schema: marts
+      +materialized: table

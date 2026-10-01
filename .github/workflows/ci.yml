@@ -1,0 +1,28 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install locked dependencies
+        run: uv sync --frozen
+
+      - name: dbt deps + parse (validates all models, tests, YAML)
+        run: |
+          uv run dbt deps --project-dir data_platform/transform --profiles-dir data_platform/transform
+          uv run dbt parse --project-dir data_platform/transform --profiles-dir data_platform/transform
+
+      - name: Dagster definitions import (validates the full asset graph)
+        run: uv run python -c "from data_platform.orchestration.definitions import defs; print(len(list(defs.resolve_asset_graph().get_all_asset_keys())), 'assets OK')"

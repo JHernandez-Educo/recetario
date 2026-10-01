@@ -1,0 +1,108 @@
+version: 2
+
+models:
+  - name: vtex_price_events
+    description: >
+      clean_vtex.price_events — VTEX price history (D1, Éxito, Euro, Jumbo).
+      One row per (store, sku, captured_at): raw sightings are deduplicated here
+      (most frequent price in the crawl, then lowest). Past clean, a duplicate
+      is a defect — grain uniqueness fails the build.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [store, sku, captured_at]
+    columns:
+      - name: store
+        description: Store key (d1, exito, euro, jumbo, mundohuevo).
+        data_tests: [not_null]
+      - name: sku
+        description: Store-local SKU (VTEX itemId or Shopify variant id).
+        data_tests: [not_null]
+      - name: price_cop
+        description: Observed price, integer Colombian pesos.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+      - name: captured_at
+        description: Observation timestamp (capture time, never source metadata — PRD R9).
+        data_tests: [not_null]
+      - name: source
+        description: scrape | receipt. Receipt observations outrank scraped ones.
+        data_tests:
+          - accepted_values:
+              values: ["scrape", "receipt"]
+
+  - name: vtex_products
+    description: >
+      clean_vtex.products — current VTEX catalog, one row per (store, sku),
+      with net content normalized from each store's spec dialect.
+      Attribute history is kept by snapshots_vtex.products_SNAPSHOT.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [store, sku]
+    columns:
+      - name: store
+        data_tests: [not_null]
+      - name: sku
+        data_tests: [not_null]
+      - name: ean
+        description: Cross-store product identity where available (VTEX only).
+      - name: net_grams
+        description: >
+          Package net content in grams, parsed per store dialect
+          (PUM / Valor de Medida / Cantidad / Jumbo ProductData). Null when
+          the package is sold by volume or count, or specs are missing.
+        data_tests:
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 50000
+              config:
+                severity: warn
+      - name: price_check_ok
+        description: >
+          VTEX x100 centavos cross-check (PRD R4). False means the COP price
+          and the cart-link centavos disagree — catastrophic if unnoticed;
+          enforced by the assert_no_failed_price_checks singular test.
+
+  - name: vtex_categories
+    description: VTEX category trees per store; defines and documents crawl scope.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [store, category_id]
+
+unit_tests:
+  - name: dedupe_tie_keeps_lowest_price
+    description: The real Euro case from 2026-10-01 — two sightings at 6450, two at 5850 in one crawl.
+    model: vtex_price_events
+    overrides:
+      macros:
+        is_incremental: false
+    given:
+      - input: source('raw_vtex', 'price_events')
+        rows:
+          - {store: euro, sku: "20853", price_cop: 6450, list_price_cop: 6450, source: scrape, captured_at: "2026-10-01 02:17:07+00"}
+          - {store: euro, sku: "20853", price_cop: 5850, list_price_cop: 5850, source: scrape, captured_at: "2026-10-01 02:17:07+00"}
+          - {store: euro, sku: "20853", price_cop: 6450, list_price_cop: 6450, source: scrape, captured_at: "2026-10-01 02:17:07+00"}
+          - {store: euro, sku: "20853", price_cop: 5850, list_price_cop: 5850, source: scrape, captured_at: "2026-10-01 02:17:07+00"}
+    expect:
+      rows:
+        - {store: euro, sku: "20853", price_cop: 5850}
+
+  - name: dedupe_majority_wins_over_lowest
+    description: Three sightings at 6450 and one at 5850 — the most frequent price wins even though it is higher.
+    model: vtex_price_events
+    overrides:
+      macros:
+        is_incremental: false
+    given:
+      - input: source('raw_vtex', 'price_events')
+        rows:
+          - {store: d1, sku: "1", price_cop: 6450, list_price_cop: 6450, source: scrape, captured_at: "2026-10-01 02:17:07+00"}
+          - {store: d1, sku: "1", price_cop: 6450, list_price_cop: 6450, source: scrape, captured_at: "2026-10-01 02:17:07+00"}
+          - {store: d1, sku: "1", price_cop: 6450, list_price_cop: 6450, source: scrape, captured_at: "2026-10-01 02:17:07+00"}
+          - {store: d1, sku: "1", price_cop: 5850, list_price_cop: 5850, source: scrape, captured_at: "2026-10-01 02:17:07+00"}
+          - {store: d1, sku: "2", price_cop: 1000, list_price_cop: 1000, source: scrape, captured_at: "2026-10-01 02:17:07+00"}
+    expect:
+      rows:
+        - {store: d1, sku: "1", price_cop: 6450}
+        - {store: d1, sku: "2", price_cop: 1000}

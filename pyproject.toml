@@ -1,0 +1,16 @@
+[project]
+name = "recetario"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "dagster>=1.13.24",
+    "dagster-dbt>=0.29.24",
+    "dagster-dlt>=0.29.24",
+    "dagster-postgres>=0.29.24",
+    "dagster-webserver>=1.13.24",
+    "dbt-core>=1.12.5",
+    "dbt-postgres>=1.11.0",
+    "dlt[ducklake,az,postgres]>=1.30.0",
+    "psutil>=7.0.0",
+    "jsonschema>=4.26.0",
+]

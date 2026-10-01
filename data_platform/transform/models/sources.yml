@@ -1,0 +1,30 @@
+version: 2
+
+# The formal handshake with dlt: these schemas are dlt-owned; dbt only reads them.
+sources:
+  - name: raw_vtex
+    description: >
+      VTEX retailer catalogs (D1, Éxito, Euro, Jumbo) loaded by the
+      data_platform/connectors/vtex dlt source. One shared set of tables; rows are
+      distinguished by the `store` column.
+    schema: raw_vtex
+    tables:
+      - name: products
+        description: Current catalog snapshot, one row per (store, sku), refreshed each run.
+      - name: price_events
+        description: Append-only price observations, emitted only when a SKU's price changed.
+      - name: categories
+        description: Each store's category tree, flattened; defines crawl scope.
+
+  - name: raw_shopify
+    description: >
+      Shopify storefront catalogs (Mundo Huevo) loaded by the
+      data_platform/connectors/shopify dlt source, with dlt-normalized nested tables.
+    schema: raw_shopify
+    tables:
+      - name: products
+        description: One row per product; incremental on Shopify's updated_at cursor.
+      - name: products__variants
+        description: dlt-normalized child table, one row per purchasable variant (SKU grain).
+      - name: price_events
+        description: Append-only price observations at variant grain, same contract as VTEX.

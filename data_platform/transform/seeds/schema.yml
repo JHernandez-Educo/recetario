@@ -1,0 +1,21 @@
+version: 2
+
+seeds:
+  - name: stores_DIM
+    description: >
+      Store dimension, hand-maintained (dbt seed). One row per store ×
+      location context; the geographic anchor is Urbanización Hacienda
+      Niquía, Bello — `zone`/`sales_channel` are the regional-pricing knobs
+      (PRD R3). Regional expansion = new rows, never schema changes.
+    config:
+      schema: marts
+      column_types:
+        store_id_PK: integer
+        sales_channel: varchar
+    columns:
+      - name: store_id_PK
+        quote: true
+        data_tests: [unique, not_null]
+      - name: store_key
+        description: Join key used by all raw/clean tables (d1, exito, euro, jumbo, mundohuevo).
+        data_tests: [unique, not_null]

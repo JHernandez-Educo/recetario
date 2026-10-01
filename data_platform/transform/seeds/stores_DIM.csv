@@ -1,0 +1,6 @@
+store_id_PK,store_key,store_name,platform,owner_group,city,zone,sales_channel,is_active
+1,d1,D1,vtex,Grupo Valorem,Bello,Niquía,1,true
+2,exito,Éxito,vtex,Grupo Éxito (Grupo Calleja),Medellín,,1,true
+3,euro,Euro Supermercados,vtex,Independiente (Inversiones Euro),Bello,COMPRAS BELLO,1,true
+4,jumbo,Jumbo,vtex,Cencosud,Medellín,,1,true
+5,mundohuevo,Mundo Huevo,shopify,Independiente,Medellín,,,true

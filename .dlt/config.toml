@@ -1,0 +1,75 @@
+# dlt project configuration (non-secret settings only; secrets go in
+# .dlt/secrets.toml, which is gitignored).
+# Reference: https://dlthub.com/docs/general-usage/credentials/setup
+
+[runtime]
+# Console log level for pipeline runs. Set to "DEBUG" when troubleshooting.
+log_level = "INFO"
+# dlt's RESTClient retry behavior (PRD hygiene: backoff, bounded attempts).
+request_max_attempts = 5
+request_backoff_factor = 2
+request_timeout = 60
+
+[sources.vtex]
+# Seconds to sleep between catalog page requests (PRD hygiene: ~1 req/s).
+request_delay = 1.0
+
+# One entry per VTEX store; adding a retailer is a config row, not code.
+# `category_roots`: case-insensitive substring match on the category path,
+# scoping the crawl to food trees (empty list = crawl every leaf category).
+
+[sources.vtex.stores.d1]
+name = "D1"
+base_url = "https://www.d1.com.co"
+category_roots = ["Despensa", "Lacteos y huevos", "Panadería y repostería", "Frutas y verduras"]
+
+[sources.shopify]
+request_delay = 1.0
+
+[sources.shopify.stores.mundohuevo]
+name = "Mundo Huevo"
+base_url = "https://mundohuevo.com"
+
+# The big chains need crawl_depth 3: their depth-2 categories exceed the
+# ~2,500-result VTEX search window (probed 2026-09-29: Euro Abarrotes = 2,580).
+
+[sources.vtex.stores.exito]
+name = "Éxito"
+base_url = "https://www.exito.com"
+crawl_depth = 3
+category_roots = [
+    "Mercado/Despensa",
+    "Mercado/Lácteos, huevos y refrigerados",
+    "Mercado/Panadería y repostería",
+    "Mercado/Frutas y verduras",
+    "Mercado/Dulces y chocolatería",
+]
+
+[sources.vtex.stores.euro]
+name = "Euro Supermercados"
+base_url = "https://www.eurosupermercados.com.co"
+crawl_depth = 3
+category_roots = [
+    "Mercado/Abarrotes",
+    "Mercado/Lacteos",
+    "Mercado/Panaderia y reporteria fresca",
+    "Mercado/Fruver",
+    "Mercado/Dulces y parva",
+    "Mercado/Refrigerados",
+]
+
+[sources.vtex.stores.jumbo]
+name = "Jumbo"
+base_url = "https://www.jumbocolombia.com"
+crawl_depth = 3
+category_roots = [
+    "Supermercado/Despensa",
+    "Supermercado/Lácteos, Huevos Y Refrigerados",
+    "Supermercado/Panadería Y Pastelería",
+    "Supermercado/Frutas Y Verduras",
+    "Supermercado/Dulces Y Postres",
+]
+
+[load]
+# Empty dlt's merge scratch tables after each load (keeps the lake tidy).
+truncate_staging_dataset = true

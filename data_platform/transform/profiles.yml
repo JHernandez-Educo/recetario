@@ -1,0 +1,14 @@
+# Connection target: the Postgres warehouse. Models never change per environment;
+# only these env vars do (host is `localhost` on the Mac, `postgres` inside Docker).
+recetario:
+  target: warehouse
+  outputs:
+    warehouse:
+      type: postgres
+      host: "{{ env_var('WAREHOUSE_HOST', 'localhost') }}"
+      port: 5432
+      user: "{{ env_var('POSTGRES_USER', 'recetario_admin') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD', '') }}"
+      dbname: warehouse
+      schema: public
+      threads: 4

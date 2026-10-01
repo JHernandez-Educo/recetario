@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "dlt": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--python",
+        "3.12",
+        "--with",
+        "dlt-mcp[search]",
+        "--with",
+        "chonkie==1.6.1",
+        "--with",
+        "dlt[duckdb]",
+        "python",
+        "-m",
+        "dlt_mcp"
+      ]
+    },
+    "dbt": {
+      "command": "uvx",
+      "args": [
+        "dbt-mcp"
+      ],
+      "env": {
+        "DBT_PROJECT_DIR": "data_platform/transform",
+        "DBT_PATH": ".venv/bin/dbt"
+      }
+    }
+  }
+}

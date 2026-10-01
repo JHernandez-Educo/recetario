@@ -1,0 +1,168 @@
+// Recetario warehouse — star schema (paste into https://dbdiagram.io)
+// Live today: marts.* (price history). Planned: the recipe costing model (PRD 06).
+
+Project recetario {
+  database_type: 'PostgreSQL'
+  Note: 'House style: <entity>_FACT / _DIM / _BRIDGE tables, <entity>_id_PK / _id_FK keys (quoted in Postgres).'
+}
+
+// ───────────── LIVE: price history ─────────────
+
+Table marts.price_events_FACT [headercolor: #1f883d] {
+  product_id_FK varchar [not null]
+  store_id_FK int [not null]
+  date_id_FK int [not null]
+  price_cop bigint [not null]
+  list_price_cop bigint
+  price_per_gram_cop numeric [note: 'the cross-store comparison measure']
+  available_qty bigint
+  source varchar
+  captured_at timestamptz [not null]
+  indexes { (product_id_FK, captured_at) [unique, note: 'grain'] }
+  Note: 'One row per (product, observation). Append-only; a row exists only when a price changed.'
+}
+
+Table marts.products_DIM [headercolor: #0969da] {
+  product_id_PK varchar [pk, note: 'hash of (store, sku)']
+  store_id_FK int [not null]
+  store_key varchar
+  sku varchar
+  ean varchar
+  source_product_id varchar
+  product_name varchar
+  item_name varchar
+  brand varchar
+  category_path varchar
+  link varchar
+  net_grams numeric
+  net_ml numeric
+  net_count bigint
+  current_price_cop bigint
+  current_list_price_cop bigint
+  is_available boolean
+  is_current boolean [note: 'false once discontinued (from the SCD2 snapshot)']
+  attributes_valid_from timestamp
+}
+
+Table marts.stores_DIM [headercolor: #0969da] {
+  store_id_PK int [pk]
+  store_key varchar [unique]
+  store_name varchar
+  platform varchar [note: 'vtex | shopify']
+  owner_group varchar
+  city varchar
+  zone varchar
+  sales_channel varchar [note: 'regional pricing knob']
+  is_active boolean
+}
+
+Table marts.date_DIM [headercolor: #0969da] {
+  date_id_PK int [pk, note: 'YYYYMMDD, Bogotá-local']
+  full_date date
+  year int
+  month int
+  month_name varchar
+  day int
+  iso_weekday int
+  iso_week int
+  is_weekend boolean
+}
+
+Ref: marts.price_events_FACT.product_id_FK > marts.products_DIM.product_id_PK
+Ref: marts.price_events_FACT.store_id_FK > marts.stores_DIM.store_id_PK
+Ref: marts.price_events_FACT.date_id_FK > marts.date_DIM.date_id_PK
+Ref: marts.products_DIM.store_id_FK > marts.stores_DIM.store_id_PK
+
+// ───────────── PLANNED: recipe costing (PRD 06) ─────────────
+
+Table marts.recipes_DIM [headercolor: #9a6700] {
+  recipe_id_PK varchar [pk]
+  recipe_name varchar
+  component_role varchar [note: 'bizcocho | relleno | cobertura | empaque | complete']
+  category varchar
+  yield_qty numeric
+  yield_unit varchar
+  source_document varchar
+  is_deleted boolean [note: 'soft delete from the catalog API']
+  updated_at timestamptz
+}
+
+Table marts.ingredients_DIM [headercolor: #9a6700] {
+  ingredient_id_PK varchar [pk]
+  ingredient_name varchar
+  default_unit varchar
+}
+
+Table marts.sizes_DIM [headercolor: #9a6700] {
+  size_id_PK int [pk]
+  size_name varchar [note: 'mini | 1/4 lb | 1 lb | 2 lb']
+  scale_factor numeric
+}
+
+Table marts.recipe_lines_BRIDGE [headercolor: #9a6700] {
+  recipe_id_FK varchar [not null]
+  ingredient_id_FK varchar [note: 'null when the line is a sub-recipe']
+  sub_recipe_id_FK varchar [note: 'recursive bill of materials: cake = bizcocho + relleno + cobertura']
+  qty numeric
+  unit varchar
+  qty_grams numeric
+  raw_text varchar
+  confidence numeric
+}
+
+Table marts.ingredient_products_BRIDGE [headercolor: #9a6700] {
+  ingredient_id_FK varchar [not null]
+  product_id_FK varchar [not null]
+  preference_rank int [note: '1 = her brand; null = cheapest wins']
+  is_acceptable boolean
+}
+
+Table marts.recipe_cost_FACT [headercolor: #9a6700] {
+  recipe_id_FK varchar [not null]
+  size_id_FK int [not null]
+  date_id_FK int [not null]
+  ingredient_cost_cop numeric
+  packaging_cost_cop numeric
+  total_cost_cop numeric
+  Note: 'Daily cost of each recipe at each size, rolled up from live prices.'
+}
+
+Table marts.menu_prices_FACT [headercolor: #9a6700] {
+  recipe_id_FK varchar [not null]
+  size_id_FK int [not null]
+  date_id_FK int [not null]
+  sale_price_cop numeric
+  suggested_price_cop numeric
+  pricing_rule varchar [note: 'markup | margin']
+  target_pct numeric
+  margin_pct numeric
+}
+
+Ref: marts.recipe_lines_BRIDGE.recipe_id_FK > marts.recipes_DIM.recipe_id_PK
+Ref: marts.recipe_lines_BRIDGE.sub_recipe_id_FK > marts.recipes_DIM.recipe_id_PK
+Ref: marts.recipe_lines_BRIDGE.ingredient_id_FK > marts.ingredients_DIM.ingredient_id_PK
+Ref: marts.ingredient_products_BRIDGE.ingredient_id_FK > marts.ingredients_DIM.ingredient_id_PK
+Ref: marts.ingredient_products_BRIDGE.product_id_FK > marts.products_DIM.product_id_PK
+Ref: marts.recipe_cost_FACT.recipe_id_FK > marts.recipes_DIM.recipe_id_PK
+Ref: marts.recipe_cost_FACT.size_id_FK > marts.sizes_DIM.size_id_PK
+Ref: marts.recipe_cost_FACT.date_id_FK > marts.date_DIM.date_id_PK
+Ref: marts.menu_prices_FACT.recipe_id_FK > marts.recipes_DIM.recipe_id_PK
+Ref: marts.menu_prices_FACT.size_id_FK > marts.sizes_DIM.size_id_PK
+Ref: marts.menu_prices_FACT.date_id_FK > marts.date_DIM.date_id_PK
+
+TableGroup price_history [color: #1f883d] {
+  marts.price_events_FACT
+  marts.products_DIM
+  marts.stores_DIM
+  marts.date_DIM
+}
+
+TableGroup recipe_costing_planned [color: #9a6700] {
+  marts.recipes_DIM
+  marts.ingredients_DIM
+  marts.sizes_DIM
+  marts.recipe_lines_BRIDGE
+  marts.ingredient_products_BRIDGE
+  marts.recipe_cost_FACT
+  marts.menu_prices_FACT
+}

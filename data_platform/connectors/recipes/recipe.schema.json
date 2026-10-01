@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Recetario recipe extraction contract v1",
+  "description": "One file per extracted recipe (a 3-recipe PDF yields 3 files). See docs/PRD-v2-recipes.md section 2.",
+  "type": "object",
+  "required": ["recipe_name", "component_role", "category", "yield", "lines", "source_document", "extracted_at", "extractor_version"],
+  "properties": {
+    "recipe_name": {"type": "string", "minLength": 1},
+    "component_role": {"enum": ["bizcocho", "relleno", "cobertura", "empaque", "complete"]},
+    "category": {"enum": ["torta", "galleta", "crema", "relleno", "pan", "otro"]},
+    "yield": {
+      "type": "object",
+      "required": ["qty", "unit"],
+      "properties": {
+        "qty": {"type": "number", "exclusiveMinimum": 0},
+        "unit": {"type": "string"}
+      }
+    },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["raw_text", "qty", "unit", "ingredient_text", "confidence"],
+        "properties": {
+          "raw_text": {"type": "string", "minLength": 1},
+          "qty": {"type": ["number", "null"]},
+          "unit": {"type": ["string", "null"]},
+          "ingredient_text": {"type": "string", "minLength": 1},
+          "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+        }
+      }
+    },
+    "sub_recipes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "qty_g"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "qty_g": {"type": "number", "exclusiveMinimum": 0}
+        }
+      }
+    },
+    "source_document": {"type": "string", "minLength": 1},
+    "source_pages": {"type": "array", "items": {"type": "integer"}},
+    "transcript_context": {"type": ["string", "null"]},
+    "extracted_at": {"type": "string", "format": "date-time"},
+    "extractor_version": {"type": "string", "minLength": 1}
+  }
+}
